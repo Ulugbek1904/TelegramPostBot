@@ -1,10 +1,10 @@
-﻿using Microsoft.Graph.Models;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
+using Message = Telegram.Bot.Types.Message;
 
 public class Program
 {

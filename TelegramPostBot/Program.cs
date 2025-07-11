@@ -13,7 +13,7 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
         var app = builder.Build();
 
-        const string BotToken = "YOUR_BOT_TOKEN_HERE"; // Bot tokenni bu yerga yozing
+        const string BotToken = "7768693479:AAEnE4f5_yZI7Ix_9AA2KDL_YyaCn8jLcHM"; 
         var BotClient = new TelegramBotClient(BotToken);
 
         var ChannelIds = new List<string>

@@ -3,4 +3,4 @@ services:
     image: ${DOCKER_REGISTRY-}telegrampostbot
     build:
       context: .
-      dockerfile: TelegramPostBot/Dockerfile
+      dockerfile: TelegramPostBot/TelegramPostBot/Dockerfile

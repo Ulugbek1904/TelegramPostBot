@@ -1,0 +1,6 @@
+services:
+  telegrampostbot:
+    image: ${DOCKER_REGISTRY-}telegrampostbot
+    build:
+      context: .
+      dockerfile: TelegramPostBot/Dockerfile

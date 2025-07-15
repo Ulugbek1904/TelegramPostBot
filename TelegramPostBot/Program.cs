@@ -25,8 +25,8 @@ public class Program
         var AllowedUsers = new HashSet<string>
 {
     "urazmetov_d",
-    "@Urazmetov_23",
-    "@sherzod_jurabekov",
+    "Urazmetov_23",
+    "sherzod_jurabekov",
     "Ulugbek19_04"
 };
 

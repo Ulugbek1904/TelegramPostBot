@@ -26,6 +26,7 @@ public class Program
 {
     "urazmetov_d",
     "@Urazmetov_23",
+    "@sherzod_jurabekov",
     "Ulugbek19_04"
 };
 

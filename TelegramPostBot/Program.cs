@@ -13,14 +13,13 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
         var app = builder.Build();
 
-        const string BotToken = "7768693479:AAEnE4f5_yZI7Ix_9AA2KDL_YyaCn8jLcHM";
+        const string BotToken = "7768693479:AAGV3XRKsYs87BK84NTfnSU5-fKdQTahjM4";
         var BotClient = new TelegramBotClient(BotToken);
 
         var AllowedUsers = new HashSet<string>
         {
             "urazmetov_d",
             "Urazmetov_23",
-            "sherzod_jurabekov",
             "Ulugbek19_04"
         };
 
@@ -158,7 +157,7 @@ public class Program
         }
     });
 
-                long urazmetovTvChatId = -1001234567890; // To'g'ri chat ID ni qo'ying
+                long urazmetovTvChatId = 1001234567890; // To'g'ri chat ID ni qo'ying
                 var failedChannels = new List<long>();
 
                 try

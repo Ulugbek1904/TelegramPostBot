@@ -1,20 +1,20 @@
 using System.Collections.Concurrent;
 using Telegram.Bot;
-using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
 using Telegram.Bot.Exceptions;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 
 public class Program
 {
     private static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
-        var app = builder.Build();
+        builder.Services.AddSingleton<ITelegramBotClient>(new TelegramBotClient("7768693479:AAGV3XRKsYs87BK84NTfnSU5-fKdQTahjM4")); // Yangi token
 
-        const string BotToken = "7768693479:AAGV3XRKsYs87BK84NTfnSU5-fKdQTahjM4";
-        var BotClient = new TelegramBotClient(BotToken);
+        var app = builder.Build();
 
         var AllowedUsers = new HashSet<string>
         {
@@ -25,20 +25,22 @@ public class Program
 
         var UserDrafts = new ConcurrentDictionary<long, PostDraft>();
 
-        var cts = new CancellationTokenSource();
-        var receiverOptions = new ReceiverOptions { AllowedUpdates = Array.Empty<UpdateType>() };
-
-        // Botni ishga tushirish
+        // Webhook ni o'rnatish
+        var botClient = app.Services.GetRequiredService<ITelegramBotClient>();
         _ = Task.Run(async () =>
         {
-            Console.WriteLine("🤖 Bot ishga tushdi (Web API + Polling)...");
-            await BotClient.ReceiveAsync(
-                new DefaultUpdateHandler(
-                    (bot, update, token) => HandleUpdateAsync(bot, update, token, AllowedUsers, UserDrafts),
-                    HandleErrorAsync),
-                receiverOptions,
-                cts.Token
-            );
+            await botClient.SetWebhook("https://telegrampostbot-d50y.onrender.com/api/update"); // Render URL yoki ngrok URL
+            Console.WriteLine("🤖 Webhook o'rnatildi...");
+        });
+
+        // Webhook endpoint
+        app.MapPost("/api/update", async (HttpContext context, ITelegramBotClient bot) =>
+        {
+            using var reader = new StreamReader(context.Request.Body);
+            var updateJson = await reader.ReadToEndAsync();
+            var update = System.Text.Json.JsonSerializer.Deserialize<Update>(updateJson); // Update ob'ektini deserializatsiya qilish
+            await HandleUpdateAsync(bot, update, context.RequestAborted, AllowedUsers, UserDrafts);
+            return Results.Ok();
         });
 
         // API endpointlar
@@ -53,226 +55,225 @@ public class Program
         app.MapGet("/", () => "✅ Bot ishlayapti");
 
         app.Run();
+    }
 
-        // Telegram logika
-        static async Task HandleUpdateAsync(
-            ITelegramBotClient bot,
-            Update update,
-            CancellationToken cancellationToken,
-            HashSet<string> AllowedUsers,
-            ConcurrentDictionary<long, PostDraft> UserDrafts)
+    static async Task HandleUpdateAsync(
+        ITelegramBotClient bot,
+        Update update,
+        CancellationToken cancellationToken,
+        HashSet<string> AllowedUsers,
+        ConcurrentDictionary<long, PostDraft> UserDrafts)
+    {
+        if (update?.Message is Message message)
         {
-            if (update.Message is Message message)
+            var chatId = message.Chat.Id;
+            var userId = message.From?.Id.ToString();
+            var username = message.From?.Username;
+
+            if (!IsUserAllowed(userId, username, AllowedUsers))
             {
-                var chatId = message.Chat.Id;
-                var userId = message.From?.Id.ToString();
-                var username = message.From?.Username;
-
-                if (!IsUserAllowed(userId, username, AllowedUsers))
-                {
-                    await bot.SendMessage(
-                        chatId,
-                        "❌ Sizda bu botdan foydalanish huquqi yo'q.\n\n📞 Ruxsat olish uchun admin bilan bog'laning: @Ulugbek19_04",
-                        cancellationToken: cancellationToken);
-                    return;
-                }
-
-                if (message.Type == MessageType.Text && message.Text == "/start")
-                {
-                    await bot.SendMessage(chatId, "📤 Rasm yoki video yuboring.", cancellationToken: cancellationToken);
-                    return;
-                }
-
-                if (message.Type == MessageType.Photo || message.Type == MessageType.Video)
-                {
-                    var fileId = message.Photo?.LastOrDefault()?.FileId ?? message.Video?.FileId;
-                    UserDrafts[chatId] = new PostDraft { MediaFileId = fileId, IsPhoto = message.Type == MessageType.Photo };
-                    await bot.SendMessage(chatId, "📌 Sarlavhani yozing:", cancellationToken: cancellationToken);
-                    return;
-                }
-
-                if (message.Type == MessageType.Text && UserDrafts.ContainsKey(chatId))
-                {
-                    var draft = UserDrafts[chatId];
-
-                    if (string.IsNullOrEmpty(draft.Title))
-                    {
-                        draft.Title = message.Text?.ToUpper() ?? string.Empty;
-                        await bot.SendMessage(chatId, "📝 Tavsifni yozing:", cancellationToken: cancellationToken);
-                        return;
-                    }
-
-                    if (string.IsNullOrEmpty(draft.Description))
-                    {
-                        draft.Description = FormatDescription(message.Text ?? string.Empty);
-
-                        string previewCaption = $"<b>{draft.Title}</b>\n\n{draft.Description}\n\n📞 <i>Murojaat uchun:</i> 👉 @Urazmetov_23\n📱 <i>WhatsApp:</i> +79372807194";
-
-                        var confirmMarkup = new InlineKeyboardMarkup(new[]
-                        {
-                            new[] { InlineKeyboardButton.WithCallbackData("✅ Tasdiqlayman", "confirm") },
-                            new[]
-                            {
-                                InlineKeyboardButton.WithUrl("Telegram", "https://t.me/urazmetov_tv"),
-                                InlineKeyboardButton.WithUrl("YouTube", "https://www.youtube.com/@urazmetovtv"),
-                                InlineKeyboardButton.WithUrl("Instagram", "https://www.instagram.com/urazmetov_d/")
-                            }
-                        });
-
-                        if (draft.IsPhoto)
-                        {
-                            await bot.SendPhoto(chatId, InputFile.FromFileId(draft.MediaFileId!), caption: previewCaption, parseMode: ParseMode.Html, replyMarkup: confirmMarkup, cancellationToken: cancellationToken);
-                        }
-                        else
-                        {
-                            await bot.SendVideo(chatId, InputFile.FromFileId(draft.MediaFileId!), caption: previewCaption, parseMode: ParseMode.Html, replyMarkup: confirmMarkup, cancellationToken: cancellationToken);
-                        }
-                    }
-                }
+                await bot.SendMessage(
+                    chatId,
+                    "❌ Sizda bu botdan foydalanish huquqi yo'q.\n\n📞 Ruxsat olish uchun admin bilan bog'laning: @Ulugbek19_04",
+                    cancellationToken: cancellationToken);
+                return;
             }
 
-            if(update.CallbackQuery is { Data: "confirm" } callback)
-{
-                var chatId = callback.Message!.Chat.Id;
-                var userId = callback.From?.Id.ToString();
-                var username = callback.From?.Username;
+            if (message.Type == MessageType.Text && message.Text == "/start")
+            {
+                await bot.SendMessage(chatId, "📤 Rasm yoki video yuboring.", cancellationToken: cancellationToken);
+                return;
+            }
 
-                if (!IsUserAllowed(userId, username, AllowedUsers))
+            if (message.Type == MessageType.Photo || message.Type == MessageType.Video)
+            {
+                var fileId = message.Photo?.LastOrDefault()?.FileId ?? message.Video?.FileId;
+                UserDrafts[chatId] = new PostDraft { MediaFileId = fileId, IsPhoto = message.Type == MessageType.Photo };
+                await bot.SendMessage(chatId, "📌 Sarlavhani yozing:", cancellationToken: cancellationToken);
+                return;
+            }
+
+            if (message.Type == MessageType.Text && UserDrafts.ContainsKey(chatId))
+            {
+                var draft = UserDrafts[chatId];
+
+                if (string.IsNullOrEmpty(draft.Title))
                 {
-                    await bot.AnswerCallbackQuery(callback.Id, "❌ Sizda bu botdan foydalanish huquqi yo'q!", showAlert: true);
+                    draft.Title = message.Text?.ToUpper() ?? string.Empty;
+                    await bot.SendMessage(chatId, "📝 Tavsifni yozing:", cancellationToken: cancellationToken);
                     return;
                 }
 
-                if (!UserDrafts.TryGetValue(chatId, out var draft)) return;
-
-                string finalCaption = $"<b>{draft.Title}</b>\n\n{draft.Description}\n\n📞 <i>Murojaat uchun:</i> 👉 @Urazmetov_23\n📱 <i>WhatsApp:</i> +79372807194";
-
-                var markup = new InlineKeyboardMarkup(new[]
+                if (string.IsNullOrEmpty(draft.Description))
                 {
-        new[]
-        {
-            InlineKeyboardButton.WithUrl("Telegram", "https://t.me/urazmetov_tv"),
-            InlineKeyboardButton.WithUrl("YouTube", "https://www.youtube.com/@urazmetovtv"),
-            InlineKeyboardButton.WithUrl("Instagram", "https://www.instagram.com/urazmetov_d/")
-        }
-    });
+                    draft.Description = FormatDescription(message.Text ?? string.Empty);
 
-                long urazmetovTvChatId = 1001234567890; // To'g'ri chat ID ni qo'ying
-                var failedChannels = new List<long>();
+                    string previewCaption = $"<b>{draft.Title}</b>\n\n{draft.Description}\n\n📞 <i>Murojaat uchun:</i> 👉 @Urazmetov_23\n📱 <i>WhatsApp:</i> +79372807194";
 
-                try
-                {
+                    var confirmMarkup = new InlineKeyboardMarkup(new[]
+                    {
+                        new[] { InlineKeyboardButton.WithCallbackData("✅ Tasdiqlayman", "confirm") },
+                        new[]
+                        {
+                            InlineKeyboardButton.WithUrl("Telegram", "https://t.me/urazmetov_tv"),
+                            InlineKeyboardButton.WithUrl("YouTube", "https://www.youtube.com/@urazmetovtv"),
+                            InlineKeyboardButton.WithUrl("Instagram", "https://www.instagram.com/urazmetov_d/")
+                        }
+                    });
+
                     if (draft.IsPhoto)
                     {
-                        await bot.SendPhoto(urazmetovTvChatId, InputFile.FromFileId(draft.MediaFileId!), caption: finalCaption, parseMode: ParseMode.Html, replyMarkup: markup, cancellationToken: cancellationToken);
+                        await bot.SendPhoto(chatId, InputFile.FromFileId(draft.MediaFileId!), caption: previewCaption, parseMode: ParseMode.Html, replyMarkup: confirmMarkup, cancellationToken: cancellationToken);
                     }
                     else
                     {
-                        await bot.SendVideo(urazmetovTvChatId, InputFile.FromFileId(draft.MediaFileId!), caption: finalCaption, parseMode: ParseMode.Html, replyMarkup: markup, cancellationToken: cancellationToken);
-                    }
-                    Console.WriteLine($"✅ @URAZMETOV TV kanaliga post muvaffaqiyatli yuborildi.");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"❌ @URAZMETOV TV kanaliga yuborishda xatolik: {ex.Message}");
-                    failedChannels.Add(urazmetovTvChatId);
-                }
-
-                var chatIds = await GetAuthorizedChatIdsAsync(bot, cancellationToken);
-                foreach (var targetChatId in chatIds)
-                {
-                    if (targetChatId != urazmetovTvChatId)
-                    {
-                        try
-                        {
-                            if (draft.IsPhoto)
-                            {
-                                await bot.SendPhoto(targetChatId, InputFile.FromFileId(draft.MediaFileId!), caption: finalCaption, parseMode: ParseMode.Html, replyMarkup: markup, cancellationToken: cancellationToken);
-                            }
-                            else
-                            {
-                                await bot.SendVideo(targetChatId, InputFile.FromFileId(draft.MediaFileId!), caption: finalCaption, parseMode: ParseMode.Html, replyMarkup: markup, cancellationToken: cancellationToken);
-                            }
-                            Console.WriteLine($"✅ {targetChatId} kanaliga post muvaffaqiyatli yuborildi.");
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"❌ {targetChatId} kanaliga yuborishda xatolik: {ex.Message}");
-                            failedChannels.Add(targetChatId);
-                        }
+                        await bot.SendVideo(chatId, InputFile.FromFileId(draft.MediaFileId!), caption: previewCaption, parseMode: ParseMode.Html, replyMarkup: confirmMarkup, cancellationToken: cancellationToken);
                     }
                 }
+            }
+        }
 
-                if (failedChannels.Count == 0)
+        if (update?.CallbackQuery is { Data: "confirm" } callback)
+        {
+            var chatId = callback.Message!.Chat.Id;
+            var userId = callback.From?.Id.ToString();
+            var username = callback.From?.Username;
+
+            if (!IsUserAllowed(userId, username, AllowedUsers))
+            {
+                await bot.AnswerCallbackQuery(callback.Id, "❌ Sizda bu botdan foydalanish huquqi yo'q!", showAlert: true);
+                return;
+            }
+
+            if (!UserDrafts.TryGetValue(chatId, out var draft)) return;
+
+            string finalCaption = $"<b>{draft.Title}</b>\n\n{draft.Description}\n\n📞 <i>Murojaat uchun:</i> 👉 @Urazmetov_23\n📱 <i>WhatsApp:</i> +79372807194";
+
+            var markup = new InlineKeyboardMarkup(new[]
+            {
+                new[]
                 {
-                    await bot.SendMessage(chatId, "✅ Post hamma kanalga yuborildi.", cancellationToken: cancellationToken);
+                    InlineKeyboardButton.WithUrl("Telegram", "https://t.me/urazmetov_tv"),
+                    InlineKeyboardButton.WithUrl("YouTube", "https://www.youtube.com/@urazmetovtv"),
+                    InlineKeyboardButton.WithUrl("Instagram", "https://www.instagram.com/urazmetov_d/")
+                }
+            });
+
+            long urazmetovTvChatId = -1001234567890; // To'g'ri chat ID ni qo'ying
+            var failedChannels = new List<long>();
+
+            try
+            {
+                if (draft.IsPhoto)
+                {
+                    await bot.SendPhoto(urazmetovTvChatId, InputFile.FromFileId(draft.MediaFileId!), caption: finalCaption, parseMode: ParseMode.Html, replyMarkup: markup, cancellationToken: cancellationToken);
                 }
                 else
                 {
-                    await bot.SendMessage(chatId, $"⚠️ Quyidagi kanallarga yuborishda xatolik yuz berdi: {string.Join(", ", failedChannels)}", cancellationToken: cancellationToken);
+                    await bot.SendVideo(urazmetovTvChatId, InputFile.FromFileId(draft.MediaFileId!), caption: finalCaption, parseMode: ParseMode.Html, replyMarkup: markup, cancellationToken: cancellationToken);
                 }
-
-                await bot.AnswerCallbackQuery(callback.Id, "✅ Post yuborildi!");
-                UserDrafts.TryRemove(chatId, out _);
+                Console.WriteLine($"✅ @URAZMETOV TV kanaliga post muvaffaqiyatli yuborildi.");
             }
-        }
-
-        static bool IsUserAllowed(string? userId, string? username, HashSet<string> AllowedUsers)
-        {
-            return (!string.IsNullOrEmpty(userId) && AllowedUsers.Contains(userId)) ||
-                   (!string.IsNullOrEmpty(username) && AllowedUsers.Contains(username));
-        }
-
-        static string FormatDescription(string input)
-        {
-            var lines = (input ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries);
-            return string.Join("\n", lines.Select(l => "🔹 " + l.Trim()));
-        }
-
-        static async Task<List<long>> GetAuthorizedChatIdsAsync(ITelegramBotClient bot, CancellationToken cancellationToken)
-        {
-            var chatIds = new List<long>();
-            var offset = 0;
-
-            while (true)
+            catch (Exception ex)
             {
-                var updates = await bot.GetUpdates(offset, 100, cancellationToken: cancellationToken);
-                if (updates.Length == 0) break;
+                Console.WriteLine($"❌ @URAZMETOV TV kanaliga yuborishda xatolik: {ex.Message}");
+                failedChannels.Add(urazmetovTvChatId);
+            }
 
-                foreach (var update in updates)
+            var chatIds = await GetAuthorizedChatIdsAsync(bot, cancellationToken);
+            foreach (var targetChatId in chatIds)
+            {
+                if (targetChatId != urazmetovTvChatId)
                 {
-                    if (update.Message?.Chat.Type == ChatType.Channel)
+                    try
                     {
-                        try
+                        if (draft.IsPhoto)
                         {
-                            await bot.SendMessage(update.Message.Chat.Id, "Test", cancellationToken: cancellationToken);
-                            chatIds.Add(update.Message.Chat.Id);
+                            await bot.SendPhoto(targetChatId, InputFile.FromFileId(draft.MediaFileId!), caption: finalCaption, parseMode: ParseMode.Html, replyMarkup: markup, cancellationToken: cancellationToken);
                         }
-                        catch (ApiRequestException ex) when (ex.ErrorCode == 403)
+                        else
                         {
-                            Console.WriteLine($"❌ {update.Message.Chat.Id} kanaliga kirish huquqi yo'q: {ex.Message}");
+                            await bot.SendVideo(targetChatId, InputFile.FromFileId(draft.MediaFileId!), caption: finalCaption, parseMode: ParseMode.Html, replyMarkup: markup, cancellationToken: cancellationToken);
                         }
+                        Console.WriteLine($"✅ {targetChatId} kanaliga post muvaffaqiyatli yuborildi.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"❌ {targetChatId} kanaliga yuborishda xatolik: {ex.Message}");
+                        failedChannels.Add(targetChatId);
                     }
                 }
-
-                offset = updates[^1].Id + 1;
             }
 
-            return chatIds;
-        }
+            if (failedChannels.Count == 0)
+            {
+                await bot.SendMessage(chatId, "✅ Post hamma kanalga yuborildi.", cancellationToken: cancellationToken);
+            }
+            else
+            {
+                await bot.SendMessage(chatId, $"⚠️ Quyidagi kanallarga yuborishda xatolik yuz berdi: {string.Join(", ", failedChannels)}", cancellationToken: cancellationToken);
+            }
 
-        static Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
-        {
-            Console.WriteLine($"❌ Bot xatosi: {exception.Message}\nStackTrace: {exception.StackTrace}");
-            return Task.CompletedTask;
+            await bot.AnswerCallbackQuery(callback.Id, "✅ Post yuborildi!");
+            UserDrafts.TryRemove(chatId, out _);
         }
     }
 
-    record PostDraft
+    static bool IsUserAllowed(string? userId, string? username, HashSet<string> AllowedUsers)
     {
-        public string? MediaFileId { get; set; }
-        public bool IsPhoto { get; set; }
-        public string? Title { get; set; }
-        public string? Description { get; set; }
+        return (!string.IsNullOrEmpty(userId) && AllowedUsers.Contains(userId)) ||
+               (!string.IsNullOrEmpty(username) && AllowedUsers.Contains(username));
     }
+
+    static string FormatDescription(string input)
+    {
+        var lines = (input ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        return string.Join("\n", lines.Select(l => "🔹 " + l.Trim()));
+    }
+
+    static async Task<List<long>> GetAuthorizedChatIdsAsync(ITelegramBotClient bot, CancellationToken cancellationToken)
+    {
+        var chatIds = new List<long>();
+        var offset = 0;
+
+        while (true)
+        {
+            var updates = await bot.GetUpdates(offset, 100, cancellationToken: cancellationToken);
+            if (updates.Length == 0) break;
+
+            foreach (var update in updates)
+            {
+                if (update.Message?.Chat.Type == ChatType.Channel)
+                {
+                    try
+                    {
+                        await bot.SendMessage(update.Message.Chat.Id, "Test", cancellationToken: cancellationToken);
+                        chatIds.Add(update.Message.Chat.Id);
+                    }
+                    catch (ApiRequestException ex) when (ex.ErrorCode == 403)
+                    {
+                        Console.WriteLine($"❌ {update.Message.Chat.Id} kanaliga kirish huquqi yo'q: {ex.Message}");
+                    }
+                }
+            }
+
+            offset = updates[^1].Id + 1;
+        }
+
+        return chatIds;
+    }
+
+    static Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
+    {
+        Console.WriteLine($"❌ Bot xatosi: {exception.Message}\nStackTrace: {exception.StackTrace}");
+        return Task.CompletedTask;
+    }
+}
+
+record PostDraft
+{
+    public string? MediaFileId { get; set; }
+    public bool IsPhoto { get; set; }
+    public string? Title { get; set; }
+    public string? Description { get; set; }
 }

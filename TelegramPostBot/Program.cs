@@ -14,8 +14,8 @@ var BotClient = new TelegramBotClient(BotToken);
 
 var ChannelIds = new List<string>
 {
-    "@ForNewProjects",
-    "@URAZMETOV TV"
+    "@urazmetov_tv",
+    "@ForNewProjects"
 };
 
 var AllowedUsers = new HashSet<string>

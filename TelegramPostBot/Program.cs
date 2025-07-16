@@ -98,14 +98,14 @@ public class Program
 
                     if (string.IsNullOrEmpty(draft.Title))
                     {
-                        draft.Title = message.Text?.ToUpper() ?? string.Empty; // Null xavfini bartaraf qilish
+                        draft.Title = message.Text?.ToUpper() ?? string.Empty;
                         await bot.SendMessage(chatId, "📝 Tavsifni yozing:", cancellationToken: cancellationToken);
                         return;
                     }
 
                     if (string.IsNullOrEmpty(draft.Description))
                     {
-                        draft.Description = FormatDescription(message.Text ?? string.Empty); // Null xavfini bartaraf qilish
+                        draft.Description = FormatDescription(message.Text ?? string.Empty);
 
                         string previewCaption = $"<b>{draft.Title}</b>\n\n{draft.Description}\n\n📞 <i>Murojaat uchun:</i> 👉 @Urazmetov_23\n📱 <i>WhatsApp:</i> +79372807194";
 
@@ -158,27 +158,51 @@ public class Program
                     }
                 });
 
-                var chatIds = await GetAuthorizedChatIdsAsync(bot, cancellationToken);
+                // Birinchi xabar @URAZMETOV TV ga
+                long urazmetovTvChatId = -1001234567890; // Xususiy kanal uchun chat ID'sini o'rnating (masalan, -1001234567890)
                 var failedChannels = new List<long>();
 
+                try
+                {
+                    if (draft.IsPhoto)
+                    {
+                        await bot.SendPhoto(urazmetovTvChatId, InputFile.FromFileId(draft.MediaFileId!), caption: finalCaption, parseMode: ParseMode.Html, replyMarkup: markup, cancellationToken: cancellationToken);
+                    }
+                    else
+                    {
+                        await bot.SendVideo(urazmetovTvChatId, InputFile.FromFileId(draft.MediaFileId!), caption: finalCaption, parseMode: ParseMode.Html, replyMarkup: markup, cancellationToken: cancellationToken);
+                    }
+                    Console.WriteLine($"✅ @URAZMETOV TV kanaliga post muvaffaqiyatli yuborildi.");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ @URAZMETOV TV kanaliga yuborishda xatolik: {ex.Message}");
+                    failedChannels.Add(urazmetovTvChatId);
+                }
+
+                // Boshqa qo‘shilgan kanallarga jo‘natish
+                var chatIds = await GetAuthorizedChatIdsAsync(bot, cancellationToken);
                 foreach (var targetChatId in chatIds)
                 {
-                    try
+                    if (targetChatId != urazmetovTvChatId) // @URAZMETOV TV ni takroran jo‘natmaslik uchun
                     {
-                        if (draft.IsPhoto)
+                        try
                         {
-                            await bot.SendPhoto(targetChatId, InputFile.FromFileId(draft.MediaFileId!), caption: finalCaption, parseMode: ParseMode.Html, replyMarkup: markup, cancellationToken: cancellationToken);
+                            if (draft.IsPhoto)
+                            {
+                                await bot.SendPhoto(targetChatId, InputFile.FromFileId(draft.MediaFileId!), caption: finalCaption, parseMode: ParseMode.Html, replyMarkup: markup, cancellationToken: cancellationToken);
+                            }
+                            else
+                            {
+                                await bot.SendVideo(targetChatId, InputFile.FromFileId(draft.MediaFileId!), caption: finalCaption, parseMode: ParseMode.Html, replyMarkup: markup, cancellationToken: cancellationToken);
+                            }
+                            Console.WriteLine($"✅ {targetChatId} kanaliga post muvaffaqiyatli yuborildi.");
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            await bot.SendVideo(targetChatId, InputFile.FromFileId(draft.MediaFileId!), caption: finalCaption, parseMode: ParseMode.Html, replyMarkup: markup, cancellationToken: cancellationToken);
+                            Console.WriteLine($"❌ {targetChatId} kanaliga yuborishda xatolik: {ex.Message}");
+                            failedChannels.Add(targetChatId);
                         }
-                        Console.WriteLine($"✅ {targetChatId} kanaliga post muvaffaqiyatli yuborildi.");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"❌ {targetChatId} kanaliga yuborishda xatolik: {ex.Message}");
-                        failedChannels.Add(targetChatId);
                     }
                 }
 

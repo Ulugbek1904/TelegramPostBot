@@ -29,7 +29,7 @@ public class Program
         var botClient = app.Services.GetRequiredService<ITelegramBotClient>();
         _ = Task.Run(async () =>
         {
-            await botClient.SetWebhook("https://telegrampostbot-d50y.onrender.com/api/update"); // Render URL yoki ngrok URL
+            await botClient.SetWebhook("https://telegrampostbot-d50y.onrender.com/api/update"); // Render URL
             Console.WriteLine("🤖 Webhook o'rnatildi...");
         });
 
@@ -38,8 +38,16 @@ public class Program
         {
             using var reader = new StreamReader(context.Request.Body);
             var updateJson = await reader.ReadToEndAsync();
-            var update = System.Text.Json.JsonSerializer.Deserialize<Update>(updateJson); // Update ob'ektini deserializatsiya qilish
-            await HandleUpdateAsync(bot, update, context.RequestAborted, AllowedUsers, UserDrafts);
+            Console.WriteLine($"Received update: {updateJson}"); // Debugging uchun
+            var update = System.Text.Json.JsonSerializer.Deserialize<Update>(updateJson, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (update != null)
+            {
+                await HandleUpdateAsync(bot, update, context.RequestAborted, AllowedUsers, UserDrafts);
+            }
+            else
+            {
+                Console.WriteLine("❌ Update deserializatsiya qilinmadi!");
+            }
             return Results.Ok();
         });
 
@@ -64,11 +72,16 @@ public class Program
         HashSet<string> AllowedUsers,
         ConcurrentDictionary<long, PostDraft> UserDrafts)
     {
-        if (update?.Message is Message message)
+        if (update == null) return; // Null tekshiruvi
+
+        if (update.Message != null)
         {
+            var message = update.Message;
             var chatId = message.Chat.Id;
             var userId = message.From?.Id.ToString();
             var username = message.From?.Username;
+
+            Console.WriteLine($"Received message from chat {chatId}: {message.Text}"); // Debugging
 
             if (!IsUserAllowed(userId, username, AllowedUsers))
             {
@@ -133,8 +146,9 @@ public class Program
             }
         }
 
-        if (update?.CallbackQuery is { Data: "confirm" } callback)
+        if (update?.CallbackQuery != null && update.CallbackQuery.Data == "confirm")
         {
+            var callback = update.CallbackQuery;
             var chatId = callback.Message!.Chat.Id;
             var userId = callback.From?.Id.ToString();
             var username = callback.From?.Username;
@@ -238,7 +252,7 @@ public class Program
 
         while (true)
         {
-            var updates = await bot.GetUpdates(offset, 100, cancellationToken: cancellationToken);
+            var updates = await bot.GetUpdatesAsync(offset, 100, cancellationToken: cancellationToken);
             if (updates.Length == 0) break;
 
             foreach (var update in updates)

@@ -18,7 +18,6 @@ public class Program
 
         var ChannelIds = new List<string>
 {
-    "@ForNewProjects",
     "@URAZMETOV TV"
 };
 

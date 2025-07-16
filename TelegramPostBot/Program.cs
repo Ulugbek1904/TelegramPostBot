@@ -71,7 +71,7 @@ public class Program
 
                 if (!IsUserAllowed(userId, username, AllowedUsers))
                 {
-                    await bot.SendMessageAsync(
+                    await bot.SendMessage(
                         chatId,
                         "❌ Sizda bu botdan foydalanish huquqi yo'q.\n\n📞 Ruxsat olish uchun admin bilan bog'laning: @Ulugbek19_04",
                         cancellationToken: cancellationToken);
@@ -80,7 +80,7 @@ public class Program
 
                 if (message.Type == MessageType.Text && message.Text == "/start")
                 {
-                    await bot.SendMessageAsync(chatId, "📤 Rasm yoki video yuboring.", cancellationToken: cancellationToken);
+                    await bot.SendMessage(chatId, "📤 Rasm yoki video yuboring.", cancellationToken: cancellationToken);
                     return;
                 }
 
@@ -88,7 +88,7 @@ public class Program
                 {
                     var fileId = message.Photo?.LastOrDefault()?.FileId ?? message.Video?.FileId;
                     UserDrafts[chatId] = new PostDraft { MediaFileId = fileId, IsPhoto = message.Type == MessageType.Photo };
-                    await bot.SendMessageAsync(chatId, "📌 Sarlavhani yozing:", cancellationToken: cancellationToken);
+                    await bot.SendMessage(chatId, "📌 Sarlavhani yozing:", cancellationToken: cancellationToken);
                     return;
                 }
 
@@ -99,7 +99,7 @@ public class Program
                     if (string.IsNullOrEmpty(draft.Title))
                     {
                         draft.Title = message.Text.ToUpper();
-                        await bot.SendMessageAsync(chatId, "📝 Tavsifni yozing:", cancellationToken: cancellationToken);
+                        await bot.SendMessage(chatId, "📝 Tavsifni yozing:", cancellationToken: cancellationToken);
                         return;
                     }
 
@@ -122,11 +122,11 @@ public class Program
 
                         if (draft.IsPhoto)
                         {
-                            await bot.SendPhotoAsync(chatId, InputFile.FromFileId(draft.MediaFileId!), caption: previewCaption, parseMode: ParseMode.Html, replyMarkup: confirmMarkup, cancellationToken: cancellationToken);
+                            await bot.SendPhoto(chatId, InputFile.FromFileId(draft.MediaFileId!), caption: previewCaption, parseMode: ParseMode.Html, replyMarkup: confirmMarkup, cancellationToken: cancellationToken);
                         }
                         else
                         {
-                            await bot.SendVideoAsync(chatId, InputFile.FromFileId(draft.MediaFileId!), caption: previewCaption, parseMode: ParseMode.Html, replyMarkup: confirmMarkup, cancellationToken: cancellationToken);
+                            await bot.SendVideo(chatId, InputFile.FromFileId(draft.MediaFileId!), caption: previewCaption, parseMode: ParseMode.Html, replyMarkup: confirmMarkup, cancellationToken: cancellationToken);
                         }
                     }
                 }
@@ -140,7 +140,7 @@ public class Program
 
                 if (!IsUserAllowed(userId, username, AllowedUsers))
                 {
-                    await bot.AnswerCallbackQueryAsync(callback.Id, "❌ Sizda bu botdan foydalanish huquqi yo'q!", showAlert: true);
+                    await bot.AnswerCallbackQuery(callback.Id, "❌ Sizda bu botdan foydalanish huquqi yo'q!", showAlert: true);
                     return;
                 }
 
@@ -167,11 +167,11 @@ public class Program
                     {
                         if (draft.IsPhoto)
                         {
-                            await bot.SendPhotoAsync(targetChatId, InputFile.FromFileId(draft.MediaFileId!), caption: finalCaption, parseMode: ParseMode.Html, replyMarkup: markup, cancellationToken: cancellationToken);
+                            await bot.SendPhoto(targetChatId, InputFile.FromFileId(draft.MediaFileId!), caption: finalCaption, parseMode: ParseMode.Html, replyMarkup: markup, cancellationToken: cancellationToken);
                         }
                         else
                         {
-                            await bot.SendVideoAsync(targetChatId, InputFile.FromFileId(draft.MediaFileId!), caption: finalCaption, parseMode: ParseMode.Html, replyMarkup: markup, cancellationToken: cancellationToken);
+                            await bot.SendVideo(targetChatId, InputFile.FromFileId(draft.MediaFileId!), caption: finalCaption, parseMode: ParseMode.Html, replyMarkup: markup, cancellationToken: cancellationToken);
                         }
                         Console.WriteLine($"✅ {targetChatId} kanaliga post muvaffaqiyatli yuborildi.");
                     }
@@ -184,14 +184,14 @@ public class Program
 
                 if (failedChannels.Count == 0)
                 {
-                    await bot.SendMessageAsync(chatId, "✅ Post hamma kanalga yuborildi.", cancellationToken: cancellationToken);
+                    await bot.SendMessage(chatId, "✅ Post hamma kanalga yuborildi.", cancellationToken: cancellationToken);
                 }
                 else
                 {
-                    await bot.SendMessageAsync(chatId, $"⚠️ Quyidagi kanallarga yuborishda xatolik yuz berdi: {string.Join(", ", failedChannels)}", cancellationToken: cancellationToken);
+                    await bot.SendMessage(chatId, $"⚠️ Quyidagi kanallarga yuborishda xatolik yuz berdi: {string.Join(", ", failedChannels)}", cancellationToken: cancellationToken);
                 }
 
-                await bot.AnswerCallbackQueryAsync(callback.Id, "✅ Post yuborildi!");
+                await bot.AnswerCallbackQuery(callback.Id, "✅ Post yuborildi!");
                 UserDrafts.TryRemove(chatId, out _);
             }
         }
@@ -215,7 +215,7 @@ public class Program
 
             while (true)
             {
-                var updates = await bot.GetUpdatesAsync(offset, 100, cancellationToken: cancellationToken);
+                var updates = await bot.GetUpdates(offset, 100, cancellationToken: cancellationToken);
                 if (updates.Length == 0) break;
 
                 foreach (var update in updates)
@@ -224,8 +224,7 @@ public class Program
                     {
                         try
                         {
-                            // Tekshirish uchun xabar yuborishga urinish
-                            await bot.SendMessageAsync(update.Message.Chat.Id, "Test", cancellationToken: cancellationToken);
+                            await bot.SendMessage(update.Message.Chat.Id, "Test", cancellationToken: cancellationToken);
                             chatIds.Add(update.Message.Chat.Id);
                         }
                         catch (ApiRequestException ex) when (ex.ErrorCode == 403)

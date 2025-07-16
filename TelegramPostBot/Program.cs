@@ -252,7 +252,7 @@ public class Program
 
         while (true)
         {
-            var updates = await bot.GetUpdatesAsync(offset, 100, cancellationToken: cancellationToken);
+            var updates = await bot.GetUpdates(offset, 100, cancellationToken: cancellationToken);
             if (updates.Length == 0) break;
 
             foreach (var update in updates)

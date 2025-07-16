@@ -98,14 +98,14 @@ public class Program
 
                     if (string.IsNullOrEmpty(draft.Title))
                     {
-                        draft.Title = message.Text.ToUpper();
+                        draft.Title = message.Text?.ToUpper() ?? string.Empty; // Null xavfini bartaraf qilish
                         await bot.SendMessage(chatId, "📝 Tavsifni yozing:", cancellationToken: cancellationToken);
                         return;
                     }
 
                     if (string.IsNullOrEmpty(draft.Description))
                     {
-                        draft.Description = FormatDescription(message.Text);
+                        draft.Description = FormatDescription(message.Text ?? string.Empty); // Null xavfini bartaraf qilish
 
                         string previewCaption = $"<b>{draft.Title}</b>\n\n{draft.Description}\n\n📞 <i>Murojaat uchun:</i> 👉 @Urazmetov_23\n📱 <i>WhatsApp:</i> +79372807194";
 
@@ -198,13 +198,13 @@ public class Program
 
         static bool IsUserAllowed(string? userId, string? username, HashSet<string> AllowedUsers)
         {
-            return !string.IsNullOrEmpty(userId) && AllowedUsers.Contains(userId) ||
-                   !string.IsNullOrEmpty(username) && AllowedUsers.Contains(username);
+            return (!string.IsNullOrEmpty(userId) && AllowedUsers.Contains(userId)) ||
+                   (!string.IsNullOrEmpty(username) && AllowedUsers.Contains(username));
         }
 
         static string FormatDescription(string input)
         {
-            var lines = input.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            var lines = (input ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries);
             return string.Join("\n", lines.Select(l => "🔹 " + l.Trim()));
         }
 
@@ -229,7 +229,6 @@ public class Program
                         }
                         catch (ApiRequestException ex) when (ex.ErrorCode == 403)
                         {
-                            // 403 xatosi - huquq yo'qligi, bu chatni o'tkazib yuboramiz
                             Console.WriteLine($"❌ {update.Message.Chat.Id} kanaliga kirish huquqi yo'q: {ex.Message}");
                         }
                     }

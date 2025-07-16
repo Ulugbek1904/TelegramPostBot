@@ -132,8 +132,8 @@ public class Program
                 }
             }
 
-            if (update.CallbackQuery is { Data: "confirm" } callback)
-            {
+            if(update.CallbackQuery is { Data: "confirm" } callback)
+{
                 var chatId = callback.Message!.Chat.Id;
                 var userId = callback.From?.Id.ToString();
                 var username = callback.From?.Username;
@@ -150,16 +150,15 @@ public class Program
 
                 var markup = new InlineKeyboardMarkup(new[]
                 {
-                    new[]
-                    {
-                        InlineKeyboardButton.WithUrl("Telegram", "https://t.me/urazmetov_tv"),
-                        InlineKeyboardButton.WithUrl("YouTube", "https://www.youtube.com/@urazmetovtv"),
-                        InlineKeyboardButton.WithUrl("Instagram", "https://www.instagram.com/urazmetov_d/")
-                    }
-                });
+        new[]
+        {
+            InlineKeyboardButton.WithUrl("Telegram", "https://t.me/urazmetov_tv"),
+            InlineKeyboardButton.WithUrl("YouTube", "https://www.youtube.com/@urazmetovtv"),
+            InlineKeyboardButton.WithUrl("Instagram", "https://www.instagram.com/urazmetov_d/")
+        }
+    });
 
-                // Birinchi xabar @URAZMETOV TV ga
-                long urazmetovTvChatId = -1001234567890; // Xususiy kanal uchun chat ID'sini o'rnating (masalan, -1001234567890)
+                long urazmetovTvChatId = -1001234567890; // To'g'ri chat ID ni qo'ying
                 var failedChannels = new List<long>();
 
                 try
@@ -180,11 +179,10 @@ public class Program
                     failedChannels.Add(urazmetovTvChatId);
                 }
 
-                // Boshqa qo‘shilgan kanallarga jo‘natish
                 var chatIds = await GetAuthorizedChatIdsAsync(bot, cancellationToken);
                 foreach (var targetChatId in chatIds)
                 {
-                    if (targetChatId != urazmetovTvChatId) // @URAZMETOV TV ni takroran jo‘natmaslik uchun
+                    if (targetChatId != urazmetovTvChatId)
                     {
                         try
                         {

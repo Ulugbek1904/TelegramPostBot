@@ -19,7 +19,7 @@ public class Program
         var ChannelIds = new List<string>
 {
     "@ForNewProjects",
-    "@YourOtherChannel"
+    "@URAZMETOV TV"
 };
 
         var AllowedUsers = new HashSet<string>

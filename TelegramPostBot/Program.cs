@@ -9,8 +9,16 @@ using Telegram.Bot.Types.ReplyMarkups;
 var builder = WebApplication.CreateBuilder(args);
 var app = builder.Build();
 
-const string BotToken = "7768693479:AAGV3XRKsYs87BK84NTfnSU5-fKdQTahjM4"; // Bot tokenni bu yerga yozing
-var BotClient = new TelegramBotClient(BotToken);
+var botToken = Environment.GetEnvironmentVariable("BOT_TOKEN");
+
+if (string.IsNullOrWhiteSpace(botToken))
+{
+    Console.WriteLine("❌ BOT_TOKEN topilmadi. Iltimos, uni Render.com da environment variable qilib qo‘shing.");
+    return;
+}
+
+var BotClient = new TelegramBotClient(botToken);
+
 
 var ChannelIds = new List<string>
 {
